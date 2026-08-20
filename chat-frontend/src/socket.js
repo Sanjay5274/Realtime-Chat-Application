@@ -17,7 +17,13 @@ export function connectSocket(onConnect, onDisconnect) {
   if (client?.active) return; // already connecting/connected
 
   client = new Client({
-    webSocketFactory: () => new WebSocket(`ws://${window.location.host}/ws`),
+    webSocketFactory: () => {
+  const wsUrl =
+    import.meta.env.VITE_WS_URL ||
+    `ws://${window.location.host}/ws`;
+
+  return new WebSocket(wsUrl);
+},
     reconnectDelay: 5000,
     onConnect: () => {
       console.log('[WS] STOMP connected');
