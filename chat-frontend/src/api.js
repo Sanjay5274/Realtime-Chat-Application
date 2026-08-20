@@ -2,7 +2,7 @@
 
 import { getToken } from './auth.js';
 
-const BASE = '/api';
+const BASE = import.meta.env.VITE_API_URL || '/api';
 
 // ------------------------------------------------------------------
 // Core fetch helpers
