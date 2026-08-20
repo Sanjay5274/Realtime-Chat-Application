@@ -7,35 +7,44 @@ const subscriptions = {}; // conversationId -> Subscription
 
 /**
  * Connect to the backend STOMP endpoint.
- * The backend exposes raw WebSocket at /ws (no SockJS).
- * Vite proxy forwards ws://localhost:5173/ws → ws://localhost:8080/ws
  *
- * @param {function} onConnect  - called when STOMP is ready
- * @param {function} onDisconnect - called when disconnected
+ * Local development:
+ *   ws://localhost:5173/ws
+ *   Vite proxies this to ws://localhost:8080/ws
+ *
+ * Production:
+ *   wss://realtime-chat-application-o4qd.onrender.com/ws
  */
 export function connectSocket(onConnect, onDisconnect) {
-  if (client?.active) return; // already connecting/connected
+  if (client?.active) return;
+
+  const wsBaseUrl =
+    import.meta.env.VITE_WS_URL ||
+    `ws://${window.location.host}`;
+
+  const wsUrl = `${wsBaseUrl}/ws`;
+
+  console.log('[WS] Connecting to:', wsUrl);
 
   client = new Client({
-    webSocketFactory: () => {
-  const wsUrl =
-    import.meta.env.VITE_WS_URL ||
-    `ws://${window.location.host}/ws`;
+    webSocketFactory: () => new WebSocket(wsUrl),
 
-  return new WebSocket(wsUrl);
-},
     reconnectDelay: 5000,
+
     onConnect: () => {
       console.log('[WS] STOMP connected');
       onConnect?.();
     },
+
     onDisconnect: () => {
       console.log('[WS] STOMP disconnected');
       onDisconnect?.();
     },
+
     onStompError: (frame) => {
       console.error('[WS] STOMP error:', frame);
     },
+
     onWebSocketError: (evt) => {
       console.error('[WS] WebSocket error:', evt);
     }
@@ -46,10 +55,6 @@ export function connectSocket(onConnect, onDisconnect) {
 
 /**
  * Subscribe to a conversation topic.
- * Unsubscribes any previous subscription for the same conversation.
- *
- * @param {number} conversationId
- * @param {function} callback - receives parsed message object
  */
 export function subscribeToConversation(conversationId, callback) {
   if (!client?.connected) {
@@ -57,7 +62,6 @@ export function subscribeToConversation(conversationId, callback) {
     return;
   }
 
-  // Unsubscribe existing subscription for this conversation
   if (subscriptions[conversationId]) {
     subscriptions[conversationId].unsubscribe();
   }
@@ -78,7 +82,7 @@ export function subscribeToConversation(conversationId, callback) {
 }
 
 /**
- * Unsubscribe from a conversation topic.
+ * Unsubscribe from a conversation.
  */
 export function unsubscribeFromConversation(conversationId) {
   if (subscriptions[conversationId]) {
@@ -89,10 +93,6 @@ export function unsubscribeFromConversation(conversationId) {
 
 /**
  * Send a chat message via STOMP.
- * senderEmail is included as fallback since STOMP Principal is not set.
- *
- * @param {object} payload - { conversationId, content, senderEmail }
- * @returns {boolean} true if sent, false if not connected
  */
 export function sendStompMessage(payload) {
   if (!client?.connected) {
@@ -109,13 +109,18 @@ export function sendStompMessage(payload) {
 }
 
 /**
- * Disconnect and clean up all subscriptions.
+ * Disconnect and clean up.
  */
 export function disconnectSocket() {
-  Object.values(subscriptions).forEach(sub => {
-    try { sub.unsubscribe(); } catch (_) {}
+  Object.values(subscriptions).forEach((sub) => {
+    try {
+      sub.unsubscribe();
+    } catch (_) {}
   });
-  Object.keys(subscriptions).forEach(k => delete subscriptions[k]);
+
+  Object.keys(subscriptions).forEach(
+    (key) => delete subscriptions[key]
+  );
 
   if (client) {
     client.deactivate();
