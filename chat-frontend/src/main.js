@@ -161,10 +161,12 @@ async function renderChat() {
   const user = getUser();
 
   app.innerHTML = `
-    <div class="chat-layout">
-      <aside class="sidebar">
+    <div class="chat-layout" id="chat-layout">
+      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+      <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
           <span class="sidebar-brand">💬 ChatApp</span>
+          <button class="btn-sidebar-close" id="btn-sidebar-close" title="Close sidebar" aria-label="Close sidebar">✕</button>
         </div>
 
         <div class="user-info-block">
@@ -180,9 +182,9 @@ async function renderChat() {
 
         <div class="section-label">
           Conversations
-          <span style="display:flex;gap:6px">
-            <button class="btn-sidebar" style="width:auto;padding:2px 8px;font-size:12px" id="btn-new-private" title="New private chat">+ Private</button>
-            <button class="btn-sidebar" style="width:auto;padding:2px 8px;font-size:12px" id="btn-new-group" title="New group chat">+ Group</button>
+          <span style="display:flex;gap:5px">
+            <button class="btn-new-conv" id="btn-new-private" title="New private chat">+ Private</button>
+            <button class="btn-new-conv" id="btn-new-group" title="New group chat">+ Group</button>
           </span>
         </div>
 
@@ -198,6 +200,9 @@ async function renderChat() {
       </aside>
 
       <main class="message-pane" id="message-pane">
+        <div class="pane-header" style="border-bottom:none;box-shadow:none;background:transparent">
+          <button class="btn-hamburger" id="btn-hamburger" title="Open conversations" aria-label="Open conversations">☰</button>
+        </div>
         <div class="empty-state">
           <span class="empty-icon">💬</span>
           <h3>Welcome, ${esc(user.username)}</h3>
@@ -235,12 +240,17 @@ async function renderChat() {
   `;
 
   document.getElementById('btn-logout').addEventListener('click', handleLogout);
-  document.getElementById('btn-new-private').addEventListener('click', openPrivateModal);
-  document.getElementById('btn-new-group').addEventListener('click', openGroupModal);
+  document.getElementById('btn-new-private').addEventListener('click', () => { closeMobileSidebar(); openPrivateModal(); });
+  document.getElementById('btn-new-group').addEventListener('click', () => { closeMobileSidebar(); openGroupModal(); });
   document.getElementById('private-cancel').addEventListener('click', () => closeModal('modal-private'));
   document.getElementById('group-cancel').addEventListener('click', () => closeModal('modal-group'));
   document.getElementById('private-confirm').addEventListener('click', confirmPrivateChat);
   document.getElementById('group-confirm').addEventListener('click', confirmGroupChat);
+
+  // Mobile sidebar toggle
+  document.getElementById('btn-hamburger')?.addEventListener('click', openMobileSidebar);
+  document.getElementById('btn-sidebar-close')?.addEventListener('click', closeMobileSidebar);
+  document.getElementById('sidebar-overlay')?.addEventListener('click', closeMobileSidebar);
 
   await refreshConversations();
   initWebSocket();
@@ -410,9 +420,13 @@ async function openConversation(conv) {
         return other?.online ? 'Online' : 'Offline';
       })();
 
+  // On mobile: close sidebar when a conversation is opened
+  closeMobileSidebar();
+
   const pane = document.getElementById('message-pane');
   pane.innerHTML = `
     <div class="pane-header">
+      <button class="btn-back" id="btn-back" title="Back to conversations" aria-label="Back to conversations">‹</button>
       <div class="${avatarClass}">${avatarLetter}</div>
       <div class="pane-header-info">
         <div class="pane-name">${esc(name)}</div>
@@ -427,7 +441,7 @@ async function openConversation(conv) {
     </div>
     <div class="input-area">
       <input class="msg-input" id="msg-input" type="text" placeholder="Type a message…" maxlength="2000" autocomplete="off" />
-      <button class="btn-send" id="btn-send" title="Send">➤</button>
+      <button class="btn-send" id="btn-send" title="Send" aria-label="Send message">➤</button>
     </div>
   `;
 
@@ -438,6 +452,8 @@ async function openConversation(conv) {
       sendMessage();
     }
   });
+  // Back button: re-opens mobile sidebar
+  document.getElementById('btn-back')?.addEventListener('click', openMobileSidebar);
 
   if (isConnected()) {
     subscribeToConversation(conv.id, onIncomingMessage);
@@ -765,6 +781,15 @@ function openModal(id) {
 
 function closeModal(id) {
   document.getElementById(id)?.classList.remove('open');
+}
+
+// ─── Mobile Sidebar Helpers ───────────────────────────────────────────────────
+function openMobileSidebar() {
+  document.getElementById('chat-layout')?.classList.add('sidebar-open');
+}
+
+function closeMobileSidebar() {
+  document.getElementById('chat-layout')?.classList.remove('sidebar-open');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
